@@ -36,12 +36,14 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface Transaction {
   id: string;
   items: any[];
   total: number;
-  paymentMethod: 'cash' | 'qris';
+  paymentMethod: string;
   timestamp: string;
   storeId: string;
   storeName?: string;
@@ -64,43 +66,114 @@ const ManagerSalesReport: React.FC = () => {
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('today');
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   
   useEffect(() => {
     if (!user) return;
 
-    // Load stores for this manager's branch
-    const savedStores = localStorage.getItem('stores');
-    if (savedStores) {
-      const allStores = JSON.parse(savedStores);
-      const branchStores = allStores.filter((store: Store) => store.branchId === user.branchId);
-      setStores(branchStores);
-    }
-    
-    // Load transactions
-    const savedTransactions = localStorage.getItem('transactions');
-    if (savedTransactions) {
-      let parsedTransactions = JSON.parse(savedTransactions);
-      
-      // Filter transactions for this manager's branch only
-      if (user.branchId) {
-        const branchStoreIds = stores.map(store => store.id);
-        parsedTransactions = parsedTransactions.filter((tx: Transaction) => 
-          branchStoreIds.includes(tx.storeId)
-        );
-        
-        // Enhance transactions with store info
-        parsedTransactions = parsedTransactions.map((transaction: Transaction) => {
-          const store = stores.find(s => s.id === transaction.storeId);
-          return {
-            ...transaction,
-            storeName: store?.name || 'Unknown Store',
-          };
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch stores for this manager's branch
+        const { data: storeData, error: storeError } = await supabase
+          .from('stores')
+          .select('id, name, branch_id, branches(name)')
+          .eq('branch_id', user.branchId || '')
+          .order('name');
+
+        if (storeError) {
+          throw storeError;
+        }
+
+        if (storeData) {
+          const formattedStores = storeData.map(store => ({
+            id: store.id,
+            name: store.name,
+            branchId: store.branch_id,
+            branchName: store.branches?.name || 'Unknown Branch'
+          }));
+          setStores(formattedStores);
+        }
+
+        // Fetch transactions
+        const { data: transactionData, error: transactionError } = await supabase
+          .from('transactions')
+          .select(`
+            id, 
+            total_amount, 
+            payment_method, 
+            transaction_date, 
+            store_id,
+            cashier_id,
+            stores(name),
+            transaction_items(
+              id,
+              menu_item_id,
+              quantity,
+              price_per_unit,
+              total_price
+            )
+          `)
+          .order('transaction_date', { ascending: false });
+
+        if (transactionError) {
+          throw transactionError;
+        }
+
+        if (transactionData) {
+          // Format transactions to match our interface
+          const formattedTransactions = transactionData.map(tx => ({
+            id: tx.id,
+            total: tx.total_amount,
+            paymentMethod: tx.payment_method,
+            timestamp: tx.transaction_date,
+            storeId: tx.store_id,
+            storeName: tx.stores?.name || 'Unknown Store',
+            cashierId: tx.cashier_id,
+            items: tx.transaction_items || []
+          }));
+          setTransactions(formattedTransactions);
+        }
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load sales data. Using cached data if available.",
+          variant: "destructive"
         });
+
+        // Load from local storage as fallback
+        const savedStores = localStorage.getItem('stores');
+        if (savedStores) {
+          const allStores = JSON.parse(savedStores);
+          const branchStores = allStores.filter((store: Store) => store.branchId === user.branchId);
+          setStores(branchStores);
+        }
+        
+        const savedTransactions = localStorage.getItem('transactions');
+        if (savedTransactions) {
+          const parsedTransactions = JSON.parse(savedTransactions);
+          const branchStoreIds = stores.map(store => store.id);
+          const filteredTx = parsedTransactions.filter((tx: Transaction) => 
+            branchStoreIds.includes(tx.storeId)
+          ).map((transaction: Transaction) => {
+            const store = stores.find(s => s.id === transaction.storeId);
+            return {
+              ...transaction,
+              storeName: store?.name || 'Unknown Store',
+            };
+          });
+          
+          setTransactions(filteredTx);
+        }
+      } finally {
+        setLoading(false);
       }
-      
-      setTransactions(parsedTransactions);
-    }
-  }, [user, stores]);
+    };
+    
+    fetchData();
+  }, [user]);
 
   useEffect(() => {
     // Apply filters whenever filter criteria change
@@ -323,7 +396,11 @@ const ManagerSalesReport: React.FC = () => {
           <TabsContent value="transactions">
             <Card>
               <CardContent className="p-0">
-                {filteredTransactions.length > 0 ? (
+                {loading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <p className="text-muted-foreground">Loading transactions...</p>
+                  </div>
+                ) : filteredTransactions.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
