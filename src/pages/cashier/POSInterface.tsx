@@ -23,7 +23,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Plus, Minus, Trash, Cash, QrCode } from 'lucide-react';
+import { Plus, Minus, Trash, CreditCard } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -472,7 +472,6 @@ const POSInterface: React.FC = () => {
                     size="sm"
                     onClick={() => setPaymentMethod('cash')}
                   >
-                    <Cash className="mr-2 h-4 w-4" />
                     Cash
                   </Button>
                   <Button
@@ -480,7 +479,7 @@ const POSInterface: React.FC = () => {
                     size="sm"
                     onClick={() => setPaymentMethod('qris')}
                   >
-                    <QrCode className="mr-2 h-4 w-4" />
+                    <CreditCard className="mr-2 h-4 w-4" />
                     QRIS
                   </Button>
                 </div>
