@@ -8,6 +8,7 @@ export interface User {
   email: string;
   role: UserRole;
   name: string;
+  password?: string; // Added password field
   branchId?: string;
   storeId?: string;
   branchName?: string;
@@ -63,17 +64,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // Mock authentication - replace with actual API call to Supabase
-      // In a real implementation, this would validate credentials with your backend
+      // Check for saved users first
+      const savedUsers = localStorage.getItem('users');
+      let allUsers = [];
       
-      // Demo users for testing
+      if (savedUsers) {
+        const parsedUsers = JSON.parse(savedUsers);
+        // Convert saved users to the format we need
+        allUsers = parsedUsers.map((u: any) => ({
+          ...u,
+          password: u.password || 'password' // Fallback for users without password
+        }));
+      }
+      
+      // Add default mock users if no saved users or if owner login is needed
       const mockUsers = [
         { id: '1', email: 'owner@example.com', password: 'password', role: 'owner', name: 'John Owner' },
         { id: '2', email: 'manager@example.com', password: 'password', role: 'manager', name: 'Sarah Manager', branchId: '1', storeId: '1', branchName: 'Main Branch', storeName: 'Main Store' },
         { id: '3', email: 'cashier@example.com', password: 'password', role: 'cashier', name: 'Mike Cashier', branchId: '1', storeId: '1', branchName: 'Main Branch', storeName: 'Main Store' },
       ];
       
-      const foundUser = mockUsers.find(u => u.email === email && u.password === password);
+      // Combine mock users with saved users, prioritizing saved users
+      const combinedUsers = [...allUsers];
+      
+      // Only add mock users that don't exist in saved users (by email)
+      mockUsers.forEach(mockUser => {
+        if (!combinedUsers.some(u => u.email === mockUser.email)) {
+          combinedUsers.push(mockUser);
+        }
+      });
+      
+      const foundUser = combinedUsers.find(u => u.email === email && u.password === password);
       
       if (foundUser) {
         const { password, ...userWithoutPassword } = foundUser;

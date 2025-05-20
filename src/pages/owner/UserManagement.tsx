@@ -26,7 +26,6 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -50,6 +49,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  password: string;  // Added password field
   role: 'manager' | 'cashier';
   branchId: string;
   branchName: string;
@@ -67,6 +67,7 @@ const UserManagement: React.FC = () => {
   const [formData, setFormData] = useState<Omit<User, 'id' | 'branchName' | 'storeName'>>({
     name: '',
     email: '',
+    password: '',  // Added password field to form data
     role: 'cashier',
     branchId: '',
     storeId: '',
@@ -131,7 +132,7 @@ const UserManagement: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.name || !formData.email || !formData.branchId || !formData.storeId) {
+    if (!formData.name || !formData.email || !formData.branchId || !formData.storeId || !formData.password) {
       toast({
         title: "Missing required fields",
         description: "Please fill in all required fields.",
@@ -146,6 +147,16 @@ const UserManagement: React.FC = () => {
       toast({
         title: "Invalid email",
         description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Password validation
+    if (formData.password.length < 6) {
+      toast({
+        title: "Weak password",
+        description: "Password should be at least 6 characters long.",
         variant: "destructive",
       });
       return;
@@ -227,7 +238,7 @@ const UserManagement: React.FC = () => {
         
         toast({
           title: "User created",
-          description: "New user has been added successfully. The default password is 'password'."
+          description: `New user has been added successfully with the specified password.`
         });
       }
       
@@ -235,6 +246,7 @@ const UserManagement: React.FC = () => {
       setFormData({
         name: '',
         email: '',
+        password: '',  // Reset password field
         role: 'cashier',
         branchId: '',
         storeId: '',
@@ -256,6 +268,7 @@ const UserManagement: React.FC = () => {
     setFormData({
       name: user.name,
       email: user.email,
+      password: user.password,  // Include password in edit form
       role: user.role,
       branchId: user.branchId,
       storeId: user.storeId,
@@ -311,6 +324,7 @@ const UserManagement: React.FC = () => {
               setFormData({
                 name: '',
                 email: '',
+                password: '',  // Reset password field
                 role: 'cashier',
                 branchId: '',
                 storeId: '',
@@ -355,6 +369,21 @@ const UserManagement: React.FC = () => {
                   value={formData.email}
                   onChange={handleChange}
                   required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  className="col-span-3"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  placeholder="Set user password"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -494,6 +523,7 @@ const UserManagement: React.FC = () => {
                     setFormData({
                       name: '',
                       email: '',
+                      password: '',  // Initialize password field
                       role: 'cashier',
                       branchId: branches.length > 0 ? branches[0].id : '',
                       storeId: '',
